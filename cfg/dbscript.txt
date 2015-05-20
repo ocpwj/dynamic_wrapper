@@ -1,0 +1,175 @@
+-- Create table
+create table hackathon_application
+(
+  id       number not null,
+  app_name varchar2(200) not null,
+  comments  varchar2(2000)
+)
+;
+-- Create/Recreate primary, unique and foreign key constraints 
+alter table hackathon_application
+  add constraint pk_application primary key (ID);
+
+
+
+
+  -- Create table
+create table hackathon_application_status
+(
+  id   number not null,
+  name varchar2(50) not null
+)
+;
+
+-- Create/Recreate primary, unique and foreign key constraints 
+alter table hackathon_application_status
+  add constraint pk_application_status primary key (ID);
+  
+insert into HACKATHON_APPLICATION_STATUS (ID, NAME)
+values (1, 'RELEASED');
+insert into HACKATHON_APPLICATION_STATUS (ID, NAME)
+values (2, 'INSTALLING');
+insert into HACKATHON_APPLICATION_STATUS (ID, NAME)
+values (3, 'INSTALLED');
+insert into HACKATHON_APPLICATION_STATUS (ID, NAME)
+values (4, 'STARTING');
+insert into HACKATHON_APPLICATION_STATUS (ID, NAME)
+values (5, 'STARTED');
+insert into HACKATHON_APPLICATION_STATUS (ID, NAME)
+values (6, 'STOPPING');
+insert into HACKATHON_APPLICATION_STATUS (ID, NAME)
+values (7, 'STOPPED');
+insert into HACKATHON_APPLICATION_STATUS (ID, NAME)
+values (8, 'UNINSTALLING');
+
+
+
+  
+-- Create table
+create table hackathon_application_version
+(
+  id                 number not null,
+  app_id             number not null,
+  version            varchar2(50) not null,
+  release_media_path varchar2(1000) not null,
+  main_class		 varchar2(1000) not null,
+  status             number not null,
+  comments           varchar2(2000)
+)
+;
+-- Create/Recreate primary, unique and foreign key constraints 
+alter table hackathon_application_version
+  add constraint pk_app_version primary key (ID);
+alter table hackathon_application_version
+  add constraint uk_app_version unique (APP_ID, VERSION);
+alter table hackathon_application_version
+  add constraint fk_app foreign key (APP_ID)
+  references hackathon_application (ID);
+alter table hackathon_application_version
+  add constraint fk_status foreign key (STATUS)
+  references hackathon_application_status (ID);
+  
+  
+-- Create table
+create table hackathon_app_ver_cfg
+(
+  id         number not null,
+  app_ver_id     number not null,
+  config_svn varchar2(500) not null,
+  comments           varchar2(2000)
+)
+;
+-- Create/Recreate primary, unique and foreign key constraints 
+alter table hackathon_app_ver_cfg
+  add constraint pk_app_cfg primary key (ID);
+alter table hackathon_app_ver_cfg
+  add constraint fk_app_ver_id foreign key (APP_VER_ID)
+  references hackathon_application_version (ID);
+alter table hackathon_app_ver_cfg
+  add constraint uk_app_ver_config unique (APP_VER_ID, config_svn);
+  
+
+
+-- Create table
+create table hackathon_control_command
+(
+  id   number not null,
+  name varchar2(50) not null
+)
+;
+-- Create/Recreate primary, unique and foreign key constraints 
+alter table hackathon_control_command
+  add constraint PK_control_command primary key (ID);
+  
+  
+insert into HACKATHON_CONTROL_COMMAND (ID, NAME)
+values (1, 'INSTALL');
+insert into HACKATHON_CONTROL_COMMAND (ID, NAME)
+values (2, 'START');
+insert into HACKATHON_CONTROL_COMMAND (ID, NAME)
+values (3, 'STOP');
+insert into HACKATHON_CONTROL_COMMAND (ID, NAME)
+values (4, 'UNINSTALL');
+commit;
+
+
+
+-- Create table
+create table hackathon_ctrl_command_status
+(
+  id   number not null,
+  name varchar2(50) not null
+)
+;
+-- Create/Recreate primary, unique and foreign key constraints 
+alter table hackathon_ctrl_command_status
+  add constraint pk_ctrl_cmd_status primary key (ID);
+  
+insert into HACKATHON_CTRL_COMMAND_STATUS (ID, NAME)
+values (1, 'WAITING');
+insert into HACKATHON_CTRL_COMMAND_STATUS (ID, NAME)
+values (2, 'RUNNING');
+insert into HACKATHON_CTRL_COMMAND_STATUS (ID, NAME)
+values (3, 'FINISHED');  
+insert into HACKATHON_CTRL_COMMAND_STATUS (ID, NAME)
+values (4, 'FAILED');  
+  
+  
+-- Create table
+create table hackathon_application_control
+(
+  id                  number not null,
+  app_version_id      number not null,
+  app_ctrl_cmd_id     number not null,
+  app_ctrl_cmd_status number not null,
+  create_date         timestamp not null,
+  modify_date         timestamp not null
+)
+;
+-- Create/Recreate primary, unique and foreign key constraints 
+alter table hackathon_application_control
+  add constraint pk_app_ctrl primary key (ID);
+alter table hackathon_application_control
+  add constraint pk_app_ver foreign key (APP_VERSION_ID)
+  references hackathon_application_version (ID);
+alter table hackathon_application_control
+  add constraint pk_app_ctrl_cmd_status foreign key (APP_CTRL_CMD_STATUS)
+  references hackathon_ctrl_command_status (ID);
+alter table hackathon_application_control
+  add constraint pk_app_ctrl_cmd foreign key (APP_CTRL_CMD_ID)
+  references hackathon_control_command (ID);
+
+CREATE OR REPLACE TRIGGER HACKATHON_APP_CTRL_AUDIT_TRG
+BEFORE INSERT OR UPDATE
+ON CEF_CNR.hackathon_application_control
+FOR EACH ROW
+BEGIN
+  -- new record created
+  IF INSERTING THEN
+    -- record the creator
+    :NEW.create_date := SYSDATE;
+  END IF;
+  -- record the last modifier
+  :NEW.modify_date := SYSDATE;
+END HACKATHON_APP_CTRL_AUDIT_TRG;
+  
