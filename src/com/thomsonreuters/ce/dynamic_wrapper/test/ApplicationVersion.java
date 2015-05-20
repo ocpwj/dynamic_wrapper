@@ -223,7 +223,7 @@ public class ApplicationVersion {
                             outputEntry.setTime(je.getTime());
                             jos.putNextEntry(outputEntry);
 
-                            if (!je.getName().toLowerCase().endsWith(".properties")) {
+                            if (je.getName().toLowerCase().endsWith(".properties")) {
                                 InputStream resInputStream = getInstallingStream(configURLString + "/" + je.getName(), "pcadmin", "Hgg41kkt");
                                 write(resInputStream, jos);
                             } else {
