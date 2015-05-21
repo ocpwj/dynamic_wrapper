@@ -1,23 +1,31 @@
 package com.thomsonreuters.ce.dynamic_wrapper.test;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FilenameFilter;
+import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.security.Permission;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+import java.util.TreeMap;
 
 import com.thomsonreuters.ce.database.EasyConnection;
 
 public class ApplicationVersion {
 	
 	private static String strSQL="select id, version, release_media_path, main_class, status from hackathon_application_version where app_id=?";
-	private static String UpdateAppVerStatustoreleased="Update hackathon_application_version set status=1 where app_id=? and status in (2,8)";
-	private static String UpdateAppVerStatustostopped="Update hackathon_application_version set status=7 where app_id=? and status in (4,6)";
-	private static String GetRunningAppVersion="select id from hackathon_application_version where app_id=? and status=5";
 	private static String UpdateAppVerStatus="Update hackathon_application_version set status=? where id=?";
-	private static int app_id;
+
 	
 	private static HashMap<Integer, ApplicationVersion> AppVerList= new HashMap<Integer, ApplicationVersion>();
 	
@@ -78,59 +86,7 @@ public class ApplicationVersion {
 		
 	}
 	
-	public static void InitializeStatus() throws Exception
-	{
-		Connection DBConn=null;
-		
-		try {
-			DBConn = new EasyConnection(ApplicationStarter.dbpool_name);
-			/////////////////////////////////////////////////////////////////////////////
-			//update all "installing","uninstalling" version to "released"
-			/////////////////////////////////////////////////////////////////////////////
-			PreparedStatement objupdatetoreleased=DBConn.prepareStatement(UpdateAppVerStatustoreleased);
-			objupdatetoreleased.setInt(1, app_id);
-			objupdatetoreleased.executeUpdate();
-			objupdatetoreleased.close();
-			
 
-			/////////////////////////////////////////////////////////////////////////////
-			//update all "starting","stopping" version to "stopped"
-			/////////////////////////////////////////////////////////////////////////////
-			PreparedStatement objupdatetostopped=DBConn.prepareStatement(UpdateAppVerStatustostopped);
-			objupdatetostopped.setInt(1, app_id);
-			objupdatetostopped.executeUpdate();			
-			objupdatetostopped.close();
-			
-			/////////////////////////////////////////////////////////////////////////////
-			//Starts running application version
-			/////////////////////////////////////////////////////////////////////////////		
-			
-			PreparedStatement objGetRunningAppVersion=DBConn.prepareStatement(GetRunningAppVersion);
-			objGetRunningAppVersion.setInt(1, app_id);
-			ResultSet objResult=objGetRunningAppVersion.executeQuery();
-
-			if (objResult.next())
-			{
-				int app_ver_id=objResult.getInt("id");
-				ApplicationVersion RunningAv=ApplicationVersion.getByVersion(app_ver_id);
-				RunningAv.Start();
-
-			}
-			
-			objResult.close();
-			objGetRunningAppVersion.close();
-		} catch (SQLException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} finally
-		{
-			try {
-				DBConn.close();
-			} catch (SQLException ex) {
-				ex.printStackTrace();
-			}
-		}
-	}
 	
 	
 	
@@ -145,19 +101,32 @@ public class ApplicationVersion {
 		try {
 			if (cmd.equals(ControlCmd.START) && (app_status.equals(app_status.INSTALLED) || app_status.equals(app_status.STOPPED)))
 			{
-				return Start();
+				UpdateAppVerStatus(ApplicationStatus.STARTING);	
+
+				Start();
+				
+				UpdateAppVerStatus(ApplicationStatus.STARTED);				
 			}
 			else if (cmd.equals(ControlCmd.STOP) && (app_status.equals(app_status.STARTED)))
 			{
-				return Stop();
+				UpdateAppVerStatus(ApplicationStatus.STOPPING);
+
+				Stop();
+				UpdateAppVerStatus(ApplicationStatus.STOPPED);				
 			}
 			else if (cmd.equals(ControlCmd.INSTALL) && (app_status.equals(app_status.RELEASED)))
 			{
-				return Install();
+				UpdateAppVerStatus(ApplicationStatus.INSTALLING);				
+				Install();
+				UpdateAppVerStatus(ApplicationStatus.INSTALLED);				
 			}
 			else if (cmd.equals(ControlCmd.UNINSTALL) && (app_status.equals(app_status.STOPPED) || app_status.equals(app_status.INSTALLED)))
 			{
-				return Uninstall();
+				
+				UpdateAppVerStatus(ApplicationStatus.UNINSTALLING);
+				Uninstall();
+				UpdateAppVerStatus(ApplicationStatus.RELEASED);
+
 			}
 			else
 			{
@@ -169,55 +138,64 @@ public class ApplicationVersion {
 			// TODO Auto-generated catch block
 			return false;
 		}
+		return true;
 			
 	}
 	
-	private boolean Start() throws Exception
+	public boolean Start() throws Exception
 	{
-		//update application status to "starting"
-		UpdateAppVerStatus(ApplicationStatus.STARTING);
-
-		String ClassPath=ApplicationStarter.install_path+"\\"+version;
-		DCL=new DynamicClassLoader(ClassPath);
-		Class class_main=DCL.loadClass(main_class);
-		Method mainMethod = class_main.getMethod("main", class_main);
-		mainMethod.invoke(null, (Object)new String[]{"start"});
 
 
-		//update status to "started"
-		UpdateAppVerStatus(ApplicationStatus.STARTED);
-		
+		try {
+			String version_install_path=ApplicationStarter.install_path+"/"+version;
+			DCL=new DynamicClassLoader(GetClassPath(version_install_path));
+			Thread.currentThread().setContextClassLoader(DCL);
+			Class class_main=DCL.loadClass(main_class);
+			Method mainMethod = class_main.getMethod("main", String[].class);
+			
+			try {
+				mainMethod.invoke(null, (Object)new String[]{"start"});
+			} catch (InvocationTargetException e) {
+				// TODO Auto-generated catch block
+				ApplicationStarter.thisLogger.error(e.getTargetException());
+			}
+
+			
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+
+
 		return true;
-		
-		
+
+
 	}
 	
 	private boolean Stop() throws Exception
 	{
-		//update status to "stopping"
-		UpdateAppVerStatus(ApplicationStatus.STOPPING);
-		
+
 		if (DCL!=null)
 		{
 			Class class_main=DCL.loadClass(main_class);
-			Method mainMethod = class_main.getMethod("main", class_main);
-			mainMethod.invoke(null, (Object)new String[]{"stop"});
-
+			Method mainMethod = class_main.getMethod("main", String[].class);			
+			
+			try {
+				mainMethod.invoke(null, (Object)new String[]{"stop"});
+			} catch (InvocationTargetException e) {
+				ApplicationStarter.thisLogger.error(e.getTargetException());
+			}
 		}
-		
-		UpdateAppVerStatus(ApplicationStatus.STOPPED);
-		
+
 		return true;
-		
+
 	}
 	
 	private boolean Install() throws Exception
 	{
-		//update status to "Installing"
-		UpdateAppVerStatus(ApplicationStatus.INSTALLING);
-		
 
-		UpdateAppVerStatus(ApplicationStatus.INSTALLED);	
+	
 		return true;
 		
 		
@@ -226,25 +204,21 @@ public class ApplicationVersion {
 	private boolean Uninstall() throws Exception
 	{
 		
-		//update status to "stopping"
-		UpdateAppVerStatus(ApplicationStatus.UNINSTALLING);
-		
-		
-		//update status to "stopped"
-		UpdateAppVerStatus(ApplicationStatus.RELEASED);
+
 		return true;
 	}
 	
 	
 	private void UpdateAppVerStatus(ApplicationStatus AS)
 	{
+		
 		Connection DBConn=null;
 		
 		try {
 			DBConn = new EasyConnection(ApplicationStarter.dbpool_name);
 			PreparedStatement objupdateappverstatus=DBConn.prepareStatement(UpdateAppVerStatus);
 			objupdateappverstatus.setInt(1, AS.getId());
-			objupdateappverstatus.setInt(1, id);
+			objupdateappverstatus.setInt(2, id);
 			objupdateappverstatus.executeUpdate();
 			objupdateappverstatus.close();
 			DBConn.commit();
@@ -262,5 +236,79 @@ public class ApplicationVersion {
 			}
 		}
 		
+		this.app_status=AS;
+		
+		
 	}
+	
+	private static String GetClassPath(String install_path)
+	{
+		StringBuffer sbPath=new StringBuffer();
+		Properties prop = new Properties();
+		try {
+			FileInputStream fis = new FileInputStream(install_path+"/wrapper.conf");
+			prop.load(fis);
+		} catch (Exception e) {
+			throw new RuntimeException("Error in parsing warpper.conf");
+		}
+		
+		TreeMap<Integer, String> pathMap=new TreeMap<Integer, String>();
+		
+		Iterator it= prop.entrySet().iterator();
+		while(it.hasNext()){
+		    Map.Entry<String, String> entry=(Map.Entry<String, String>)it.next();
+		    String key = entry.getKey();
+		    if (key.startsWith("wrapper.java.classpath."))
+		    {
+		    	int pathorder=Integer.valueOf(key.substring(23));
+		    	
+		    	String classpath=entry.getValue();
+		    	if (classpath.startsWith("%REPO_DIR%"))
+		    	{
+		    		classpath=classpath.substring(11);
+		    	}	
+		    	else
+		    	{
+		    		classpath=classpath.substring(4);
+		    	}
+		    			
+		    	pathMap.put(pathorder, classpath);
+		    }
+		}
+		
+		it = pathMap.entrySet().iterator();         
+		while(it.hasNext()){      
+		     Map.Entry<String, String> entry1=(Map.Entry<String, String>)it.next();    
+		     
+		     if (sbPath.length()==0)
+		     {
+		    	 sbPath.append(install_path).append("/").append(entry1.getValue());  
+		     }
+		     else
+		     {
+		    	 sbPath.append(";").append(install_path).append("/").append(entry1.getValue());  
+		     }
+		     
+		}   
+		
+		return sbPath.toString();
+        
+
+	}
+	
+    public static void writeToArr(File dir, FilenameFilter searchSuffix, StringBuffer Classpath) {
+        
+        File []files = dir.listFiles();
+        for(File f : files){
+            if(f.isDirectory()){
+                //ตÝน้มหกฃ
+                writeToArr(f, searchSuffix, Classpath);       
+            }else{
+                if(searchSuffix.accept(dir, f.getName())){
+                    Classpath.append(";"+f.getAbsolutePath());
+                }
+            }
+        }
+    }
+    
 }

@@ -39,6 +39,9 @@ public class ApplicationStarter implements SrvControl {
 	
 	private String GetNewCommandDetails="select hav.id as ver_id,hac.app_ctrl_cmd_id as cmd_id from hackathon_application_control hac,hackathon_applicaiton_version hav where hac.rowid=? and hac.app_ctrl_cmd_status=1 and hac.app_version_id=hav.id and hav.app_id = ?";
 	private String FailOutstandingCommands="update hackathon_application_control set app_ctrl_cmd_status=4  where app_ctrl_cmd_status in (1,2) and app_version_id in (select id from hackathon_application_version where app_id=?)";
+	private static String UpdateAppVerStatustoreleased="Update hackathon_application_version set status=1 where app_id=? and status in (2,8)";
+	private static String UpdateAppVerStatustostopped="Update hackathon_application_version set status=7 where app_id=? and status in (4,5,6)";
+	private static String GetRunningAppVersion="select id from hackathon_application_version where app_id=? and status=5";
 	
 	private String UpdateCtrlCommandStatus="update hackathon_application_control set app_ctrl_cmd_status=?  where rowid=?";
 	
@@ -64,14 +67,17 @@ public class ApplicationStarter implements SrvControl {
 	@Override
 	public void Start(Properties arg0) {
 		// TODO Auto-generated method stub
-		Connection DBConn=null;
+		
+		System.setSecurityManager(new NoExitSecurityManager());
+		
+		EasyConnection DBConn=null;
 		
 		try {
 			/////////////////////////////////////////////////////////////////////////////
 			// Initialize logging
 			/////////////////////////////////////////////////////////////////////////////
 			PropertyConfigurator.configure(log_config);
-			thisLogger=Logger.getLogger(this.getClass().getName());
+			thisLogger=Logger.getLogger("dynamicwrapper");
 			thisLogger.info("Logging is working");		
 			
 			/////////////////////////////////////////////////////////////////////////////
@@ -102,6 +108,10 @@ public class ApplicationStarter implements SrvControl {
 			objResult.close();
 			objGetAppIDbyName.close();
 			
+			/////////////////////////////////////////////////////////////////////////////
+			//Initialize existing application version status
+			/////////////////////////////////////////////////////////////////////////////
+			InitializeStatus();
 			
 			/////////////////////////////////////////////////////////////////////////////
 			//Fail outstanding tasks in queue
@@ -114,19 +124,14 @@ public class ApplicationStarter implements SrvControl {
 			objGetOutstandingCmd.close();     
 			
 			/////////////////////////////////////////////////////////////////////////////
-			//Initialize existing application version status
-			/////////////////////////////////////////////////////////////////////////////
-			ApplicationVersion.InitializeStatus();			
-			
-			
-			/////////////////////////////////////////////////////////////////////////////
 			//Register DB change listener
 			/////////////////////////////////////////////////////////////////////////////
 	        Properties prop = new Properties();
 	        prop.setProperty(OracleConnection.DCN_NOTIFY_ROWIDS, "true");
 	        prop.setProperty(OracleConnection.DCN_IGNORE_DELETEOP, "true");
 	        prop.setProperty(OracleConnection.DCN_IGNORE_UPDATEOP, "true");
-	        DatabaseChangeRegistration databaseChangeRegistration = ((OracleConnection)DBConn).registerDatabaseChangeNotification(prop);
+	        OracleConnection RAWConn=DBConn.getRawConnection();
+	        DatabaseChangeRegistration databaseChangeRegistration = RAWConn.registerDatabaseChangeNotification(prop);
 	        
 	        databaseChangeRegistration.addListener(new DatabaseChangeListener() { 
                 public void onDatabaseChangeNotification(DatabaseChangeEvent databaseChangeEvent) {
@@ -145,7 +150,11 @@ public class ApplicationStarter implements SrvControl {
             }
             rs.close();
             stmt.close();
-            
+
+			
+
+			
+			            
 			
 		} catch (SQLException e) {
 			// TODO Auto-generated catch block
@@ -156,11 +165,11 @@ public class ApplicationStarter implements SrvControl {
 		} 
 		finally
 		{
-			try {
-				DBConn.close();
-			} catch (SQLException ex) {
-				ex.printStackTrace();
-			}
+//			try {
+//				DBConn.close();
+//			} catch (SQLException ex) {
+//				ex.printStackTrace();
+//			}
 		}
 		
 	}
@@ -251,10 +260,78 @@ public class ApplicationStarter implements SrvControl {
 		}		
 		
 	}
+	
+	public static void InitializeStatus() throws Exception
+	{
+		Connection DBConn=null;
+		
+		try {
+			DBConn = new EasyConnection(dbpool_name);
+			
+			/////////////////////////////////////////////////////////////////////////////
+			//Get running application version
+			/////////////////////////////////////////////////////////////////////////////				
+			PreparedStatement objGetRunningAppVersion=DBConn.prepareStatement(GetRunningAppVersion);
+			objGetRunningAppVersion.setInt(1, app_id);
+			ResultSet objResult=objGetRunningAppVersion.executeQuery();
+
+			int running_app_ver_id=0;
+			
+			if (objResult.next())
+			{
+				running_app_ver_id=objResult.getInt("id");
+
+			}
+			
+			/////////////////////////////////////////////////////////////////////////////
+			//update all "installing","uninstalling" version to "released"
+			/////////////////////////////////////////////////////////////////////////////
+			PreparedStatement objupdatetoreleased=DBConn.prepareStatement(UpdateAppVerStatustoreleased);
+			objupdatetoreleased.setInt(1, app_id);
+			objupdatetoreleased.executeUpdate();
+			objupdatetoreleased.close();
+
+			/////////////////////////////////////////////////////////////////////////////
+			//update all "starting","started","stopping" version to "stopped"
+			/////////////////////////////////////////////////////////////////////////////
+			PreparedStatement objupdatetostopped=DBConn.prepareStatement(UpdateAppVerStatustostopped);
+			objupdatetostopped.setInt(1, app_id);
+			objupdatetostopped.executeUpdate();			
+			objupdatetostopped.close();
+			
+			DBConn.commit();
+			
+			ApplicationVersion.LoadAllVersions();
+			
+			/////////////////////////////////////////////////////////////////////////////
+			//Starts running application version
+			/////////////////////////////////////////////////////////////////////////////	
+			if (running_app_ver_id!=0)
+			{
+				ApplicationVersion RunningAv=ApplicationVersion.getByVersion(running_app_ver_id);
+				// RunningAv=ApplicationVersion.getByVersion(running_app_ver_id);
+				RunningAv.Perform(ControlCmd.START);
+			}			
+			
+			objResult.close();
+			objGetRunningAppVersion.close();
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} finally
+		{
+			try {
+				DBConn.close();
+			} catch (SQLException ex) {
+				ex.printStackTrace();
+			}
+		}
+	}	
 
 	@Override
 	public void Stop() {
 		// TODO Auto-generated method stub
+		System.setSecurityManager(new SecurityManager());
 
 	}
 
