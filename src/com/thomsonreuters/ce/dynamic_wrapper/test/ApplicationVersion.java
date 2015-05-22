@@ -41,6 +41,55 @@ import com.thomsonreuters.ce.database.EasyConnection;
 
 public class ApplicationVersion {
 	
+	public int getId() {
+		return id;
+	}
+
+
+	public void setId(int id) {
+		this.id = id;
+	}
+
+
+	public String getVersion() {
+		return version;
+	}
+
+
+	public void setVersion(String version) {
+		this.version = version;
+	}
+
+
+	public String getRelease_media_path() {
+		return release_media_path;
+	}
+
+
+	public void setRelease_media_path(String release_media_path) {
+		this.release_media_path = release_media_path;
+	}
+
+
+	public String getMain_class() {
+		return main_class;
+	}
+
+
+	public void setMain_class(String main_class) {
+		this.main_class = main_class;
+	}
+
+
+	public ApplicationStatus getApp_status() {
+		return app_status;
+	}
+
+
+	public void setApp_status(ApplicationStatus app_status) {
+		this.app_status = app_status;
+	}
+
 	private static String strSQL="select id, version, release_media_path, main_class, status from hackathon_application_version where app_id=?";
 	private static String UpdateAppVerStatus="Update hackathon_application_version set status=? where id=?";
 
@@ -232,6 +281,9 @@ public class ApplicationVersion {
 				} catch (InvocationTargetException e) {
 					ApplicationStarter.thisLogger.error(e.getTargetException());
 				}
+				
+				DCL=null;
+				System.gc();
 			}
 
 			ApplicationStarter.thisLogger.info("Application:"+ApplicationStarter.app_name+" version:"+version+" has been stopped");
@@ -282,8 +334,13 @@ public class ApplicationVersion {
 								jos.putNextEntry(outputEntry);
 
 								if (je.getName().toLowerCase().endsWith(".properties")) {
-									InputStream resInputStream = getInstallingStream(configURLString + "/" + je.getName(), "pcadmin", "Hgg41kkt");
-									write(resInputStream, jos);
+									try(InputStream resInputStream = getInstallingStream(configURLString + "/" + je.getName(), "pcadmin", "Hgg41kkt")){
+										write(resInputStream, jos);
+									}
+									catch (Exception e){
+										//System.out.println(e.getMessage());
+										write(jis, jos);
+									}
 								} else {
 									write(jis, jos);
 								}
@@ -380,7 +437,7 @@ public class ApplicationVersion {
 		StringBuffer sbPath=new StringBuffer();
 		Properties prop = new Properties();
 		try {
-			FileInputStream fis = new FileInputStream(install_path+"/wrapper.conf");
+			FileInputStream fis = new FileInputStream(install_path+"/etc/wrapper.conf");
 			prop.load(fis);
 		} catch (Exception e) {
 			throw new RuntimeException("Error in parsing warpper.conf");
@@ -399,30 +456,31 @@ public class ApplicationVersion {
 		    	String classpath=entry.getValue();
 		    	if (classpath.startsWith("%REPO_DIR%"))
 		    	{
-		    		classpath=classpath.substring(11);
-		    	}	
+		    		classpath=install_path+"/repo/"+classpath.substring(11);
+		    	}
 		    	else
 		    	{
-		    		classpath=classpath.substring(4);
+		    		classpath=install_path+"/"+classpath;
 		    	}
-		    			
+		    			    			
 		    	pathMap.put(pathorder, classpath);
 		    }
 		}
 		
+		String path_separator=System.getProperty("path.separator");
+				
 		it = pathMap.entrySet().iterator();         
 		while(it.hasNext()){      
 		     Map.Entry<String, String> entry1=(Map.Entry<String, String>)it.next();    
 		     
 		     if (sbPath.length()==0)
 		     {
-		    	 sbPath.append(install_path).append("/").append(entry1.getValue());  
+		    	 sbPath.append(entry1.getValue());  
 		     }
 		     else
 		     {
-		    	 sbPath.append(";").append(install_path).append("/").append(entry1.getValue());  
-		     }
-		     
+		    	 sbPath.append(path_separator).append(entry1.getValue());  
+		     }		     
 		}   
 		
 		return sbPath.toString();

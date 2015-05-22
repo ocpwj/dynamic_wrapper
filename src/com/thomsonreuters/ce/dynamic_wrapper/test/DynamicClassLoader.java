@@ -18,7 +18,7 @@ public class DynamicClassLoader extends ClassLoader {
 	
 	@Override
 	public URL getResource(String ResourceName) {
-		//System.out.print("Looking for resource:"+ResourceName);
+		System.out.print("Looking for resource:"+ResourceName);
 		// TODO Auto-generated method stub
 		for (String thisPath : ClassPath)
 		{
@@ -57,7 +57,7 @@ public class DynamicClassLoader extends ClassLoader {
 					
 				}
 				
-				//System.out.println(" found");
+				System.out.println(" found");
 				return RescourceURL;
 				
 			} catch (Exception e) {
@@ -66,7 +66,7 @@ public class DynamicClassLoader extends ClassLoader {
 			} 		
 		}
 		
-		//System.out.println(" not found");
+		System.out.println(" not found");
 		
 		return null;		
 
@@ -74,7 +74,7 @@ public class DynamicClassLoader extends ClassLoader {
 
 	@Override
 	public Enumeration<URL> getResources(String name) throws IOException {
-		//System.out.println("Looking for resources:"+name);
+		System.out.println("Looking for resources:"+name);
 		// TODO Auto-generated method stub
 		Vector<URL> URLs=new Vector<URL>();
 		URL thisURL=getResource(name);
@@ -90,7 +90,7 @@ public class DynamicClassLoader extends ClassLoader {
 	@Override
 	public InputStream getResourceAsStream(String ResourceName) {
 		
-		//System.out.print("Looking for resourceasstream:"+ResourceName);
+		System.out.print("Looking for resourceasstream:"+ResourceName);
 		
 		// TODO Auto-generated method stub
 		for (String thisPath : ClassPath)
@@ -128,7 +128,7 @@ public class DynamicClassLoader extends ClassLoader {
 					
 				}
 				
-				//System.out.println(" found");
+				System.out.println(" found");
 				return ClassIStream;
 				
 			} catch (Exception e) {
@@ -137,7 +137,7 @@ public class DynamicClassLoader extends ClassLoader {
 			} 		
 		}
 		
-		//System.out.println(" not found");
+		System.out.println(" not found");
 		return null;
 	}
 

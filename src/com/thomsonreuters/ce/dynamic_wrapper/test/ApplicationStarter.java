@@ -33,6 +33,7 @@ public class ApplicationStarter implements SrvControl {
 	protected static int app_id=0;
 	protected static String install_path;
 	protected static Logger thisLogger=null;
+	private ControlCmd currentCMD=null;
 
 	
 	private String GetAppIDbyName="select id from hackathon_application where app_name=?"; 
@@ -118,11 +119,7 @@ public class ApplicationStarter implements SrvControl {
 	        
 	        databaseChangeRegistration.addListener(new DatabaseChangeListener() { 
                 public void onDatabaseChangeNotification(DatabaseChangeEvent databaseChangeEvent) {
-        			synchronized(this)
-        			{
-                    	ApplicationStarter.CommandHandler(databaseChangeEvent);
-        				
-        			}
+        			ApplicationStarter.CommandHandler(databaseChangeEvent);
                 }
             });
 	        
@@ -135,7 +132,7 @@ public class ApplicationStarter implements SrvControl {
             stmt.close();
 
 			
-
+            thisLogger.info("Listening new command to table hackathon_application_control");
 			
 			            
 			
@@ -179,15 +176,37 @@ public class ApplicationStarter implements SrvControl {
 				thisLogger.info("new command on rowid:"+rowid+" has nothing to do with app:"+app_name);
 				return;
 			}
-			
+						
 			//Update control command status to running
 			UpdateCtrlCmdStatus(rowid,CmdStatus.RUNNING);
 			
 			int app_ver_id=objResult.getInt("ver_id");
 			ControlCmd cmd=ControlCmd.getByCode(objResult.getInt("cmd_id"));
-			String parameter=objResult.getString("parameter");
 			
 			ApplicationVersion av=ApplicationVersion.getByVersion(app_ver_id);
+			
+			synchronized(this)
+			{
+				if (currentCMD!=null)
+				{
+					thisLogger.warn("Can not respond to new command: "+cmd.getName()+", as there's an ongoing command: "+currentCMD.getName()+" running on version: "+ av.getVersion());
+					UpdateCtrlCmdStatus(rowid,CmdStatus.FAILED);
+					objResult.close();
+					objGetNewCommandDetails.close();
+					return;
+				}
+				else
+				{
+					currentCMD=cmd;
+				}
+			}
+			
+			
+			
+			String parameter=objResult.getString("parameter");
+			
+			
+			
 
 			boolean result =av.Perform(cmd,parameter);
 			
@@ -199,9 +218,15 @@ public class ApplicationStarter implements SrvControl {
 			{
 				UpdateCtrlCmdStatus(rowid,CmdStatus.FAILED);
 			}
-			
+						
 			objResult.close();
 			objGetNewCommandDetails.close();
+			
+			synchronized(this)
+			{
+				currentCMD=null;
+			}			
+			
 		} catch (SQLException e1) {
 			// TODO Auto-generated catch block
 			e1.printStackTrace();
@@ -267,6 +292,8 @@ public class ApplicationStarter implements SrvControl {
 
 			}
 			
+			thisLogger.info("Updating previous version status");
+			
 			/////////////////////////////////////////////////////////////////////////////
 			//update all "installing","uninstalling" version to "released"
 			/////////////////////////////////////////////////////////////////////////////
@@ -292,6 +319,7 @@ public class ApplicationStarter implements SrvControl {
 			/////////////////////////////////////////////////////////////////////////////	
 			if (running_app_ver_id!=0)
 			{
+				thisLogger.info("Starting application which was running previously");
 				ApplicationVersion RunningAv=ApplicationVersion.getByVersion(running_app_ver_id);
 				// RunningAv=ApplicationVersion.getByVersion(running_app_ver_id);
 				RunningAv.Perform(ControlCmd.START,"");
