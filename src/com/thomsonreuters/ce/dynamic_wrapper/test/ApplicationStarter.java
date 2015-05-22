@@ -37,7 +37,7 @@ public class ApplicationStarter implements SrvControl {
 	
 	private String GetAppIDbyName="select id from hackathon_application where app_name=?"; 
 	
-	private String GetNewCommandDetails="select hav.id as ver_id,hac.app_ctrl_cmd_id as cmd_id from hackathon_application_control hac,hackathon_applicaiton_version hav where hac.rowid=? and hac.app_ctrl_cmd_status=1 and hac.app_version_id=hav.id and hav.app_id = ?";
+	private String GetNewCommandDetails="select hav.id as ver_id,hac.app_ctrl_cmd_id as cmd_id, parameter as parameter from hackathon_application_control hac,hackathon_application_version hav where hac.rowid=? and hac.app_ctrl_cmd_status=1 and hac.app_version_id=hav.id and hav.app_id = ?";
 	private String FailOutstandingCommands="update hackathon_application_control set app_ctrl_cmd_status=4  where app_ctrl_cmd_status in (1,2) and app_version_id in (select id from hackathon_application_version where app_id=?)";
 	private static String UpdateAppVerStatustoreleased="Update hackathon_application_version set status=1 where app_id=? and status in (2,8)";
 	private static String UpdateAppVerStatustostopped="Update hackathon_application_version set status=7 where app_id=? and status in (4,5,6)";
@@ -45,23 +45,6 @@ public class ApplicationStarter implements SrvControl {
 	
 	private String UpdateCtrlCommandStatus="update hackathon_application_control set app_ctrl_cmd_status=?  where rowid=?";
 	
-	/*
-	select 
-		hav.id as id, 
-		hac.app_ctrl_cmd_id as command_id 
-	from 
-		hackathon_application_control hac,
-		hackathon_applicaiton_version hav
-
-	where 
-		hac.rowid=? 
-		and
-		hac.app_ctrl_cmd_status=1
-		and
-		hac.app_version_id=hav.id
-		and
-		hav.app_id = ?
-	 */
 	
 
 	@Override
@@ -202,10 +185,11 @@ public class ApplicationStarter implements SrvControl {
 			
 			int app_ver_id=objResult.getInt("ver_id");
 			ControlCmd cmd=ControlCmd.getByCode(objResult.getInt("cmd_id"));
+			String parameter=objResult.getString("parameter");
 			
 			ApplicationVersion av=ApplicationVersion.getByVersion(app_ver_id);
 
-			boolean result =av.Perform(cmd);
+			boolean result =av.Perform(cmd,parameter);
 			
 			if (result)
 			{
@@ -241,7 +225,7 @@ public class ApplicationStarter implements SrvControl {
 			DBConn = new EasyConnection(dbpool_name);
 			PreparedStatement objupdatectrlcmdstatus=DBConn.prepareStatement(UpdateCtrlCommandStatus);
 			objupdatectrlcmdstatus.setInt(1, cs.getId());
-			objupdatectrlcmdstatus.setString(1, rowid);
+			objupdatectrlcmdstatus.setString(2, rowid);
 			objupdatectrlcmdstatus.executeUpdate();
 			objupdatectrlcmdstatus.close();
 			DBConn.commit();
@@ -310,7 +294,7 @@ public class ApplicationStarter implements SrvControl {
 			{
 				ApplicationVersion RunningAv=ApplicationVersion.getByVersion(running_app_ver_id);
 				// RunningAv=ApplicationVersion.getByVersion(running_app_ver_id);
-				RunningAv.Perform(ControlCmd.START);
+				RunningAv.Perform(ControlCmd.START,"");
 			}			
 			
 			objResult.close();

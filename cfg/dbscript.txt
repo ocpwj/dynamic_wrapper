@@ -73,8 +73,9 @@ alter table hackathon_application_version
 -- Create table
 create table hackathon_app_ver_cfg
 (
-  id         number not null,
+  id         number not null,  
   app_ver_id     number not null,
+  name 		 varchar2(50) not null,
   config_svn varchar2(500) not null,
   comments           varchar2(2000)
 )
@@ -86,7 +87,7 @@ alter table hackathon_app_ver_cfg
   add constraint fk_app_ver_id foreign key (APP_VER_ID)
   references hackathon_application_version (ID);
 alter table hackathon_app_ver_cfg
-  add constraint uk_app_ver_config unique (APP_VER_ID, config_svn);
+  add constraint uk_app_ver_config unique (APP_VER_ID, name);
   
 
 
@@ -142,6 +143,7 @@ create table hackathon_application_control
   app_version_id      number not null,
   app_ctrl_cmd_id     number not null,
   app_ctrl_cmd_status number not null,
+  parameter 		  varchar2(1000) null,
   create_date         timestamp not null,
   modify_date         timestamp not null
 )
@@ -172,4 +174,6 @@ BEGIN
   -- record the last modifier
   :NEW.modify_date := SYSDATE;
 END HACKATHON_APP_CTRL_AUDIT_TRG;
+
+insert into hackathon_application_control (id, app_version_id, app_ctrl_cmd_id,app_ctrl_cmd_status, parameter) values (7,6,1,1,'http://subversion.commodities.int.thomsonreuters.com/svn/new-web/scripts/deploy/config/esb/puthurricanes/beta') 
   
