@@ -7,7 +7,6 @@ import java.util.Map;
 public enum ApplicationStatus {
 	RELEASED(1, "RELEASED"),
 	INSTALLING(2, "INSTALLING"),
-	INSTALLED(3, "INSTALLED"), // TODO verify the sign of the region
 	STARTING(4, "STARTING"),
 	STARTED(5, "STARTED"),
 	STOPPING(6, "STOPPING"),

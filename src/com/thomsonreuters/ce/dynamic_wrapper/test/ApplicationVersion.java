@@ -118,11 +118,19 @@ public class ApplicationVersion {
 	{
 		boolean result;
 
-		if (cmd.equals(ControlCmd.START) && (app_status.equals(app_status.INSTALLED) || app_status.equals(app_status.STOPPED)))
+		if (cmd.equals(ControlCmd.START) && (app_status.equals(app_status.STOPPED)))
 		{
 			UpdateAppVerStatus(ApplicationStatus.STARTING);	
 			result=Start();				
-			UpdateAppVerStatus(ApplicationStatus.STARTED);				
+			
+			if (result)
+			{
+				UpdateAppVerStatus(ApplicationStatus.STARTED);				
+			}
+			else
+			{
+				
+			}
 		}
 		else if (cmd.equals(ControlCmd.STOP) && (app_status.equals(app_status.STARTED)))
 		{
@@ -134,9 +142,9 @@ public class ApplicationVersion {
 		{
 			UpdateAppVerStatus(ApplicationStatus.INSTALLING);				
 			result=Install(parameter);
-			UpdateAppVerStatus(ApplicationStatus.INSTALLED);				
+			UpdateAppVerStatus(ApplicationStatus.STOPPED);				
 		}
-		else if (cmd.equals(ControlCmd.UNINSTALL) && (app_status.equals(app_status.STOPPED) || app_status.equals(app_status.INSTALLED)))
+		else if (cmd.equals(ControlCmd.UNINSTALL) && (app_status.equals(app_status.STOPPED) ))
 		{
 
 			UpdateAppVerStatus(ApplicationStatus.UNINSTALLING);
@@ -342,7 +350,6 @@ public class ApplicationVersion {
 		}
 		
 		this.app_status=AS;
-		
 		
 	}
 	
