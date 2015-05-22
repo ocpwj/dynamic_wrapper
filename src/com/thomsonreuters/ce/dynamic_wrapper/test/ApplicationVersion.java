@@ -117,61 +117,56 @@ public class ApplicationVersion {
 	public boolean Perform(ControlCmd cmd, String parameter)
 	{
 		boolean result;
-		try {
-			if (cmd.equals(ControlCmd.START) && (app_status.equals(app_status.INSTALLED) || app_status.equals(app_status.STOPPED)))
-			{
-				UpdateAppVerStatus(ApplicationStatus.STARTING);	
-				result=Start();				
-				UpdateAppVerStatus(ApplicationStatus.STARTED);				
-			}
-			else if (cmd.equals(ControlCmd.STOP) && (app_status.equals(app_status.STARTED)))
-			{
-				UpdateAppVerStatus(ApplicationStatus.STOPPING);
-				result=Stop();
-				UpdateAppVerStatus(ApplicationStatus.STOPPED);				
-			}
-			else if (cmd.equals(ControlCmd.INSTALL) && (app_status.equals(app_status.RELEASED)))
-			{
-				UpdateAppVerStatus(ApplicationStatus.INSTALLING);				
-				result=Install(parameter);
-				UpdateAppVerStatus(ApplicationStatus.INSTALLED);				
-			}
-			else if (cmd.equals(ControlCmd.UNINSTALL) && (app_status.equals(app_status.STOPPED) || app_status.equals(app_status.INSTALLED)))
-			{
-				
-				UpdateAppVerStatus(ApplicationStatus.UNINSTALLING);
-				result=Uninstall();
-				UpdateAppVerStatus(ApplicationStatus.RELEASED);
 
-			}
-			else
-			{
-				ApplicationStarter.thisLogger.warn("Can not execute command:"+cmd.getName()+" on version:" + this.version);
-				return false;
-			}
-			
-			return result;
-			
-		} catch (Exception e) {
-			// TODO Auto-generated catch block
-			ApplicationStarter.thisLogger.warn("Error occured while executing command:"+cmd.getName(), e);
-			return false;
+		if (cmd.equals(ControlCmd.START) && (app_status.equals(app_status.INSTALLED) || app_status.equals(app_status.STOPPED)))
+		{
+			UpdateAppVerStatus(ApplicationStatus.STARTING);	
+			result=Start();				
+			UpdateAppVerStatus(ApplicationStatus.STARTED);				
 		}
+		else if (cmd.equals(ControlCmd.STOP) && (app_status.equals(app_status.STARTED)))
+		{
+			UpdateAppVerStatus(ApplicationStatus.STOPPING);
+			result=Stop();
+			UpdateAppVerStatus(ApplicationStatus.STOPPED);				
+		}
+		else if (cmd.equals(ControlCmd.INSTALL) && (app_status.equals(app_status.RELEASED)))
+		{
+			UpdateAppVerStatus(ApplicationStatus.INSTALLING);				
+			result=Install(parameter);
+			UpdateAppVerStatus(ApplicationStatus.INSTALLED);				
+		}
+		else if (cmd.equals(ControlCmd.UNINSTALL) && (app_status.equals(app_status.STOPPED) || app_status.equals(app_status.INSTALLED)))
+		{
 
+			UpdateAppVerStatus(ApplicationStatus.UNINSTALLING);
+			result=Uninstall();
+			UpdateAppVerStatus(ApplicationStatus.RELEASED);
 			
+		}
+		else
+		{
+			ApplicationStarter.thisLogger.warn("Can not execute command:"+cmd.getName()+" on version:" + this.version);
+			result=false;
+		}
+		
+		return result;
+
+		
+
 	}
 	
-	public boolean Start() throws Exception
+	public boolean Start()
 	{
-		ApplicationStarter.thisLogger.info("Starting application:"+ApplicationStarter.app_name+" version:"+version);
-
 		try {
+			ApplicationStarter.thisLogger.info("Starting application:"+ApplicationStarter.app_name+" version:"+version);
+
 			String version_install_path=ApplicationStarter.install_path+"/"+version;
 			DCL=new DynamicClassLoader(GetClassPath(version_install_path));
 			Thread.currentThread().setContextClassLoader(DCL);
 			Class class_main=DCL.loadClass(main_class);
 			Method mainMethod = class_main.getMethod("main", String[].class);
-			
+
 			try {
 				mainMethod.invoke(null, (Object)new String[]{"start"});
 			} catch (InvocationTargetException e) {
@@ -179,98 +174,106 @@ public class ApplicationVersion {
 				ApplicationStarter.thisLogger.error(e.getTargetException());
 			}
 
-			
+			ApplicationStarter.thisLogger.info("Application:"+ApplicationStarter.app_name+" version:"+version+" has been started");
+
+			return true;
+
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		
-		ApplicationStarter.thisLogger.info("Application:"+ApplicationStarter.app_name+" version:"+version+" has been started");
-
-
-
-		return true;
-
+			ApplicationStarter.thisLogger.error("Error occured while executing start command.", e);
+			return false;
+		}		
 
 	}
 	
-	private boolean Stop() throws Exception
+	private boolean Stop() 
 	{
 		
-		ApplicationStarter.thisLogger.info("Stopping application:"+ApplicationStarter.app_name+" version:"+version);
+		try {
+			ApplicationStarter.thisLogger.info("Stopping application:"+ApplicationStarter.app_name+" version:"+version);
 
-		if (DCL!=null)
-		{
-			Class class_main=DCL.loadClass(main_class);
-			Method mainMethod = class_main.getMethod("main", String[].class);			
-			
-			try {
-				mainMethod.invoke(null, (Object)new String[]{"stop"});
-			} catch (InvocationTargetException e) {
-				ApplicationStarter.thisLogger.error(e.getTargetException());
+			if (DCL!=null)
+			{
+				Class class_main=DCL.loadClass(main_class);
+				Method mainMethod = class_main.getMethod("main", String[].class);			
+				
+				try {
+					mainMethod.invoke(null, (Object)new String[]{"stop"});
+				} catch (InvocationTargetException e) {
+					ApplicationStarter.thisLogger.error(e.getTargetException());
+				}
 			}
-		}
 
-		ApplicationStarter.thisLogger.info("Application:"+ApplicationStarter.app_name+" version:"+version+" has been stopped");
-		return true;
+			ApplicationStarter.thisLogger.info("Application:"+ApplicationStarter.app_name+" version:"+version+" has been stopped");
+			return true;
+			
+		} catch (Exception e) {
+			ApplicationStarter.thisLogger.error("Error occured while executing stop command.", e);
+			return false;
+		}
 
 	}
 	
-	private boolean Install(String configURLString) throws Exception
+	private boolean Install(String configURLString) 
 	{
 
-		ApplicationStarter.thisLogger.info("Installing application:"+ApplicationStarter.app_name+" version:"+version+" to folder:"+ApplicationStarter.install_path+"/"+version);
-        String mainJarName = ApplicationStarter.app_name+"-"+version+".jar";
-        File dir = new File(ApplicationStarter.install_path+"/"+version);
-        if (dir.exists())
-        {
-        	FileUtils.cleanDirectory(dir);
-        }
-        
-        InputStream release = getInstallingStream(release_media_path, null, null);
+		try {
+			ApplicationStarter.thisLogger.info("Installing application:"+ApplicationStarter.app_name+" version:"+version+" to folder:"+ApplicationStarter.install_path+"/"+version);
+			String mainJarName = ApplicationStarter.app_name+"-"+version+".jar";
+			File dir = new File(ApplicationStarter.install_path+"/"+version);
+			if (dir.exists())
+			{
+				FileUtils.cleanDirectory(dir);
+			}
 
-        GZIPInputStream gis = new GZIPInputStream(release);
-        TarInputStream tin = new TarInputStream(gis);
-        TarEntry te;
-        while ((te = tin.getNextEntry()) != null) {
-            if (te.isDirectory()) {            	
-                new File(dir, te.getName()).mkdirs();
-                ApplicationStarter.thisLogger.info("Created folder:"+te.getName());
-                continue;
-            }
-            String outName = te.getName();
-            File out = new File(dir, outName);
-            try (FileOutputStream fos = new FileOutputStream(out)) {
-                if (outName.toLowerCase().endsWith(mainJarName)) {
-                	ApplicationStarter.thisLogger.info("Found main application jar file:"+outName);
-                	
-                    JarInputStream jis = new JarInputStream(tin);
-                    try (JarOutputStream jos = new JarOutputStream(new BufferedOutputStream(fos))) {
-                        JarEntry je;
-                        while ((je = jis.getNextJarEntry()) != null) {
-                            JarEntry outputEntry = new JarEntry(je.getName());
-                            outputEntry.setTime(je.getTime());
-                            jos.putNextEntry(outputEntry);
+			InputStream release = getInstallingStream(release_media_path, null, null);
 
-                            if (!je.getName().toLowerCase().endsWith(".properties")) {
-                                InputStream resInputStream = getInstallingStream(configURLString + "/" + je.getName(), "pcadmin", "Hgg41kkt");
-                                write(resInputStream, jos);
-                            } else {
-                                write(jis, jos);
-                            }
-                        }
-                    }
-                } else {
-                	write(tin, fos);
-                    ApplicationStarter.thisLogger.info("Installed "+out.getAbsolutePath());
-                }
-            }
-        }		
-	
-        ApplicationStarter.thisLogger.info("Application:"+ApplicationStarter.app_name+" version:"+version+" has been installed to folder:"+ApplicationStarter.install_path+"/"+version);
-		return true;
-		
-		
+			GZIPInputStream gis = new GZIPInputStream(release);
+			TarInputStream tin = new TarInputStream(gis);
+			TarEntry te;
+			while ((te = tin.getNextEntry()) != null) {
+				if (te.isDirectory()) {            	
+					new File(dir, te.getName()).mkdirs();
+					ApplicationStarter.thisLogger.info("Created folder:"+te.getName());
+					continue;
+				}
+				String outName = te.getName();
+				File out = new File(dir, outName);
+				try (FileOutputStream fos = new FileOutputStream(out)) {
+					if (outName.toLowerCase().endsWith(mainJarName)) {
+						ApplicationStarter.thisLogger.info("Found main application jar file:"+outName);
+
+						JarInputStream jis = new JarInputStream(tin);
+						try (JarOutputStream jos = new JarOutputStream(new BufferedOutputStream(fos))) {
+							JarEntry je;
+							while ((je = jis.getNextJarEntry()) != null) {
+								JarEntry outputEntry = new JarEntry(je.getName());
+								outputEntry.setTime(je.getTime());
+								jos.putNextEntry(outputEntry);
+
+								if (je.getName().toLowerCase().endsWith(".properties")) {
+									InputStream resInputStream = getInstallingStream(configURLString + "/" + je.getName(), "pcadmin", "Hgg41kkt");
+									write(resInputStream, jos);
+								} else {
+									write(jis, jos);
+								}
+							}
+						}
+					} else {
+						write(tin, fos);
+						ApplicationStarter.thisLogger.info("Installed "+out.getAbsolutePath());
+					}
+				}
+			}		
+
+			ApplicationStarter.thisLogger.info("Application:"+ApplicationStarter.app_name+" version:"+version+" has been installed to folder:"+ApplicationStarter.install_path+"/"+version);
+			return true;
+
+		} catch (Exception e) {
+			ApplicationStarter.thisLogger.error("Error occured while executing install command with parameter \""+configURLString+"\" .", e);
+			return false;
+		}		
+
 	}
 	
     private void write(InputStream is, OutputStream os) throws Exception {
@@ -297,12 +300,17 @@ public class ApplicationVersion {
     }
 
 
-	private boolean Uninstall() throws Exception
+	private boolean Uninstall()
 	{
-		ApplicationStarter.thisLogger.info("Uninstalling application:"+ApplicationStarter.app_name+" version:"+version+" in folder:"+ApplicationStarter.install_path+"/"+version);
-		FileUtils.deleteDirectory(new File(ApplicationStarter.install_path,version));
-		ApplicationStarter.thisLogger.info("Application:"+ApplicationStarter.app_name+" version:"+version+" in folder:"+ApplicationStarter.install_path+"/"+version +" has been uninstalled");
-		return true;
+		try{
+			ApplicationStarter.thisLogger.info("Uninstalling application:"+ApplicationStarter.app_name+" version:"+version+" in folder:"+ApplicationStarter.install_path+"/"+version);
+			FileUtils.deleteDirectory(new File(ApplicationStarter.install_path,version));
+			ApplicationStarter.thisLogger.info("Application:"+ApplicationStarter.app_name+" version:"+version+" in folder:"+ApplicationStarter.install_path+"/"+version +" has been uninstalled");
+			return true;
+		} catch (Exception e) {
+			ApplicationStarter.thisLogger.error("Error occured while executing uninstall command.", e);
+			return false;
+		}	
 	}
 	
 	
