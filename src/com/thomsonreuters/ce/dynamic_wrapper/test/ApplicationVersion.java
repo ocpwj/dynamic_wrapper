@@ -154,7 +154,7 @@ public class ApplicationVersion {
 			
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
-			e.printStackTrace();
+			ApplicationStarter.thisLogger.warn("Error occured while executing command:"+cmd.getName(), e);
 			return false;
 		}
 
@@ -225,7 +225,6 @@ public class ApplicationVersion {
         if (dir.exists())
         {
         	FileUtils.cleanDirectory(dir);
-        	dir.mkdir();
         }
         
         InputStream release = getInstallingStream(release_media_path, null, null);
