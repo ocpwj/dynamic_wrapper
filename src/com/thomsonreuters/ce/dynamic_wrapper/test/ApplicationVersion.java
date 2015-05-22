@@ -129,27 +129,49 @@ public class ApplicationVersion {
 			}
 			else
 			{
-				
+				UpdateAppVerStatus(ApplicationStatus.STOPPED);
 			}
 		}
 		else if (cmd.equals(ControlCmd.STOP) && (app_status.equals(app_status.STARTED)))
 		{
 			UpdateAppVerStatus(ApplicationStatus.STOPPING);
 			result=Stop();
-			UpdateAppVerStatus(ApplicationStatus.STOPPED);				
+			if (result)
+			{
+				UpdateAppVerStatus(ApplicationStatus.STOPPED);				
+			}
+			else
+			{
+				UpdateAppVerStatus(ApplicationStatus.STARTED);
+			}	
+			
 		}
 		else if (cmd.equals(ControlCmd.INSTALL) && (app_status.equals(app_status.RELEASED)))
 		{
 			UpdateAppVerStatus(ApplicationStatus.INSTALLING);				
 			result=Install(parameter);
-			UpdateAppVerStatus(ApplicationStatus.STOPPED);				
+			if (result)
+			{
+				UpdateAppVerStatus(ApplicationStatus.STOPPED);				
+			}
+			else
+			{
+				UpdateAppVerStatus(ApplicationStatus.RELEASED);
+			}				
 		}
 		else if (cmd.equals(ControlCmd.UNINSTALL) && (app_status.equals(app_status.STOPPED) ))
 		{
 
 			UpdateAppVerStatus(ApplicationStatus.UNINSTALLING);
 			result=Uninstall();
-			UpdateAppVerStatus(ApplicationStatus.RELEASED);
+			if (result)
+			{
+				UpdateAppVerStatus(ApplicationStatus.RELEASED);				
+			}
+			else
+			{
+				UpdateAppVerStatus(ApplicationStatus.STOPPED);
+			}		
 			
 		}
 		else
